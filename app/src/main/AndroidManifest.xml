@@ -1,0 +1,43 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    package="com.thermohygro.offlinesensor">
+
+    <!--
+      STRICT ZERO-NETWORK ARCHITECTURE:
+      android.permission.INTERNET and android.permission.ACCESS_NETWORK_STATE
+      are intentionally omitted. The Android OS kernel prevents this UID from
+      opening any AF_INET / AF_INET6 sockets.
+    -->
+
+    <!-- Declare hardware environmental & inertial sensors (optional so fallback works) -->
+    <uses-feature
+        android:name="android.hardware.sensor.ambient_temperature"
+        android:required="false" />
+    <uses-feature
+        android:name="android.hardware.sensor.relative_humidity"
+        android:required="false" />
+    <uses-feature
+        android:name="android.hardware.sensor.accelerometer"
+        android:required="false" />
+    <uses-feature
+        android:name="android.hardware.sensor.compass"
+        android:required="false" />
+
+    <application
+        android:allowBackup="false"
+        android:label="ThermoHygro °F"
+        android:supportsRtl="true"
+        android:theme="@android:style/Theme.Black">
+
+        <activity
+            android:name=".MainActivity"
+            android:exported="true"
+            android:screenOrientation="portrait">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity>
+    </application>
+
+</manifest>
