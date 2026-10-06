@@ -33,8 +33,9 @@ import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.core.content.ContextCompat
+import java.util.Locale
 import kotlin.math.ln
-import kotlin.math.roundToInt
 
 /**
  * Zero-Network Android Thermometer (°F), Relative Humidity (% RH),
@@ -128,7 +129,12 @@ class MainActivity : ComponentActivity(), SensorEventListener {
         ambientTempSensor?.let { sensor ->
             sensorManager.registerListener(this, sensor, SensorManager.SENSOR_DELAY_UI)
         } ?: run {
-            registerReceiver(batteryThermalReceiver, IntentFilter(Intent.ACTION_BATTERY_CHANGED))
+            ContextCompat.registerReceiver(
+                this,
+                batteryThermalReceiver,
+                IntentFilter(Intent.ACTION_BATTERY_CHANGED),
+                ContextCompat.RECEIVER_EXPORTED
+            )
         }
 
         relativeHumiditySensor?.let { sensor ->
@@ -251,6 +257,14 @@ fun ThermoHygroScreen(
         calculateHeatIndexFahrenheit(tempFahrenheit, calibratedRh)
     } else null
 
+    val accuracyLabel = when (accuracy) {
+        SensorManager.SENSOR_STATUS_ACCURACY_HIGH -> "HIGH"
+        SensorManager.SENSOR_STATUS_ACCURACY_MEDIUM -> "MEDIUM"
+        SensorManager.SENSOR_STATUS_ACCURACY_LOW -> "LOW"
+        SensorManager.SENSOR_STATUS_UNRELIABLE -> "UNRELIABLE"
+        else -> "UNCALIBRATED"
+    }
+
     Column(
         modifier = Modifier
             .fillMaxSize()
@@ -258,12 +272,24 @@ fun ThermoHygroScreen(
             .padding(20.dp),
         verticalArrangement = Arrangement.spacedBy(14.dp)
     ) {
-        Text(
-            text = "THERMOHYGRO · ZERO-NETWORK ANDROID APK",
-            color = Color(0xFF34D399),
-            fontSize = 12.sp,
-            fontFamily = FontFamily.Monospace
-        )
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Text(
+                text = "THERMOHYGRO · ZERO-NETWORK ANDROID APK",
+                color = Color(0xFF34D399),
+                fontSize = 12.sp,
+                fontFamily = FontFamily.Monospace
+            )
+            Text(
+                text = "ACC: $accuracyLabel",
+                color = Color(0xFF94A3B8),
+                fontSize = 11.sp,
+                fontFamily = FontFamily.Monospace
+            )
+        }
 
         // Primary Fahrenheit Card
         Column(
@@ -273,15 +299,20 @@ fun ThermoHygroScreen(
                 .border(1.dp, Color(0xFF1E293B))
                 .padding(20.dp)
         ) {
+            val tempSourceLabel = when {
+                hasHardwareTemp -> "AMBIENT TEMPERATURE (FAHRENHEIT)"
+                usingBatteryFallback -> "BATTERY THERMISTOR (COMPENSATED)"
+                else -> "TEMPERATURE SENSOR UNAVAILABLE"
+            }
             Text(
-                text = if (usingBatteryFallback) "BATTERY THERMISTOR (COMPENSATED)" else "AMBIENT TEMPERATURE (FAHRENHEIT)",
+                text = tempSourceLabel,
                 color = Color(0xFF94A3B8),
                 fontSize = 11.sp,
                 fontFamily = FontFamily.Monospace
             )
             Spacer(modifier = Modifier.height(6.dp))
             Text(
-                text = tempFahrenheit?.let { String.format("%.2f °F", it) } ?: "--.-- °F",
+                text = tempFahrenheit?.let { String.format(Locale.US, "%.2f °F", it) } ?: "--.-- °F",
                 color = Color(0xFF38BDF8),
                 fontSize = 42.sp,
                 fontWeight = FontWeight.Bold,
@@ -297,20 +328,46 @@ fun ThermoHygroScreen(
                 .border(1.dp, Color(0xFF1E293B))
                 .padding(20.dp)
         ) {
+            val rhSourceLabel = if (hasHardwareHumidity) {
+                "RELATIVE HUMIDITY (SENSOR_TYPE_12)"
+            } else {
+                "HUMIDITY SENSOR UNAVAILABLE"
+            }
             Text(
-                text = "RELATIVE HUMIDITY (SENSOR_TYPE_12)",
+                text = rhSourceLabel,
                 color = Color(0xFF94A3B8),
                 fontSize = 11.sp,
                 fontFamily = FontFamily.Monospace
             )
             Spacer(modifier = Modifier.height(6.dp))
             Text(
-                text = calibratedRh?.let { String.format("%.1f %% RH", it) } ?: "--.- % RH",
+                text = calibratedRh?.let { String.format(Locale.US, "%.1f %% RH", it) } ?: "--.- % RH",
                 color = Color(0xFFFBBF24),
                 fontSize = 34.sp,
                 fontWeight = FontWeight.Bold,
                 fontFamily = FontFamily.Monospace
             )
+
+            if (dewPointF != null || heatIndexF != null) {
+                Spacer(modifier = Modifier.height(8.dp))
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween
+                ) {
+                    Text(
+                        text = "Dew Point: " + (dewPointF?.let { String.format(Locale.US, "%.1f °F", it) } ?: "--"),
+                        color = Color(0xFF94A3B8),
+                        fontSize = 12.sp,
+                        fontFamily = FontFamily.Monospace
+                    )
+                    Text(
+                        text = "Heat Index: " + (heatIndexF?.let { String.format(Locale.US, "%.1f °F", it) } ?: "--"),
+                        color = Color(0xFF94A3B8),
+                        fontSize = 12.sp,
+                        fontFamily = FontFamily.Monospace
+                    )
+                }
+            }
         }
 
         // 3-Axis Accelerometer Card
@@ -329,7 +386,7 @@ fun ThermoHygroScreen(
             )
             Spacer(modifier = Modifier.height(6.dp))
             Text(
-                text = String.format("X: %+.2f   Y: %+.2f   Z: %+.2f m/s²", accelX, accelY, accelZ),
+                text = String.format(Locale.US, "X: %+.2f   Y: %+.2f   Z: %+.2f m/s²", accelX, accelY, accelZ),
                 color = Color(0xFFA78BFA),
                 fontSize = 19.sp,
                 fontWeight = FontWeight.Bold,
@@ -356,6 +413,7 @@ fun ThermoHygroScreen(
             Spacer(modifier = Modifier.height(6.dp))
             Text(
                 text = String.format(
+                    Locale.US,
                     "%03.0f° %s  (Bx:%+.0f By:%+.0f Bz:%+.0f µT)",
                     compassHeadingDeg,
                     cardinalDirection(compassHeadingDeg),
