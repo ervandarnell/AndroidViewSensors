@@ -38,16 +38,16 @@ import java.util.Locale
 import kotlin.math.ln
 
 /**
- * Zero-Network Android Thermometer (°F), Relative Humidity (% RH),
+ * Zero-Network Android Thermometer (°F), Relative Humidity (% RH), Barometer (hPa / inHg),
  * 3-Axis Accelerometer (X/Y/Z m/s²), and Magnetic Compass (0°–360° Heading & µT).
- * Reads hardware Sensor.TYPE_AMBIENT_TEMPERATURE (13), Sensor.TYPE_RELATIVE_HUMIDITY (12),
- * Sensor.TYPE_ACCELEROMETER (1), and Sensor.TYPE_MAGNETIC_FIELD (2) directly from SensorManager.
+ * Reads hardware sensors directly from SensorManager.
  */
 class MainActivity : ComponentActivity(), SensorEventListener {
 
     private lateinit var sensorManager: SensorManager
     private var ambientTempSensor: Sensor? = null
     private var relativeHumiditySensor: Sensor? = null
+    private var pressureSensor: Sensor? = null
     private var accelerometerSensor: Sensor? = null
     private var magnetometerSensor: Sensor? = null
 
@@ -58,6 +58,7 @@ class MainActivity : ComponentActivity(), SensorEventListener {
     // Reactive state holders for Compose UI
     private var rawCelsius by mutableStateOf<Float?>(null)
     private var relativeHumidity by mutableStateOf<Float?>(null)
+    private var rawPressureHpa by mutableStateOf<Float?>(null)
     private var usingBatteryFallback by mutableStateOf(false)
     private var accelX by mutableStateOf(0.0f)
     private var accelY by mutableStateOf(0.0f)
@@ -93,6 +94,7 @@ class MainActivity : ComponentActivity(), SensorEventListener {
         sensorManager = getSystemService(Context.SENSOR_SERVICE) as SensorManager
         ambientTempSensor = sensorManager.getDefaultSensor(Sensor.TYPE_AMBIENT_TEMPERATURE)
         relativeHumiditySensor = sensorManager.getDefaultSensor(Sensor.TYPE_RELATIVE_HUMIDITY)
+        pressureSensor = sensorManager.getDefaultSensor(Sensor.TYPE_PRESSURE)
         accelerometerSensor = sensorManager.getDefaultSensor(Sensor.TYPE_ACCELEROMETER)
         magnetometerSensor = sensorManager.getDefaultSensor(Sensor.TYPE_MAGNETIC_FIELD)
 
@@ -105,6 +107,7 @@ class MainActivity : ComponentActivity(), SensorEventListener {
                     ThermoHygroScreen(
                         rawTempC = rawCelsius,
                         rawRh = relativeHumidity,
+                        pressureHpa = rawPressureHpa,
                         tempOffsetC = calibrationTempOffsetC,
                         rhOffset = calibrationRhOffset,
                         accelX = accelX,
@@ -116,6 +119,7 @@ class MainActivity : ComponentActivity(), SensorEventListener {
                         compassHeadingDeg = compassHeadingDeg,
                         hasHardwareTemp = ambientTempSensor != null,
                         hasHardwareHumidity = relativeHumiditySensor != null,
+                        hasHardwareBarometer = pressureSensor != null,
                         usingBatteryFallback = usingBatteryFallback,
                         accuracy = sensorAccuracy
                     )
@@ -138,6 +142,10 @@ class MainActivity : ComponentActivity(), SensorEventListener {
         }
 
         relativeHumiditySensor?.let { sensor ->
+            sensorManager.registerListener(this, sensor, SensorManager.SENSOR_DELAY_UI)
+        }
+
+        pressureSensor?.let { sensor ->
             sensorManager.registerListener(this, sensor, SensorManager.SENSOR_DELAY_UI)
         }
 
@@ -169,6 +177,9 @@ class MainActivity : ComponentActivity(), SensorEventListener {
             }
             Sensor.TYPE_RELATIVE_HUMIDITY -> {
                 relativeHumidity = event.values[0]
+            }
+            Sensor.TYPE_PRESSURE -> {
+                rawPressureHpa = event.values[0]
             }
             Sensor.TYPE_ACCELEROMETER -> {
                 System.arraycopy(event.values, 0, gravityReading, 0, 3)
@@ -203,6 +214,13 @@ class MainActivity : ComponentActivity(), SensorEventListener {
 
 fun celsiusToFahrenheit(celsius: Float): Float = (celsius * 9.0f / 5.0f) + 32.0f
 
+fun hpaToInHg(hpa: Float): Float = hpa * 0.0295300f
+
+fun calculateAltitudeFeet(pressureHpa: Float): Float {
+    val meters = SensorManager.getAltitude(SensorManager.PRESSURE_STANDARD_ATMOSPHERE, pressureHpa)
+    return meters * 3.28084f
+}
+
 fun cardinalDirection(deg: Float): String {
     val dirs = arrayOf("N", "NE", "E", "SE", "S", "SW", "W", "NW")
     val idx = ((deg + 22.5f) / 45.0f).toInt() and 7
@@ -231,6 +249,7 @@ fun calculateHeatIndexFahrenheit(tempF: Float, rh: Float): Float {
 fun ThermoHygroScreen(
     rawTempC: Float?,
     rawRh: Float?,
+    pressureHpa: Float?,
     tempOffsetC: Float,
     rhOffset: Float,
     accelX: Float,
@@ -242,6 +261,7 @@ fun ThermoHygroScreen(
     compassHeadingDeg: Float,
     hasHardwareTemp: Boolean,
     hasHardwareHumidity: Boolean,
+    hasHardwareBarometer: Boolean,
     usingBatteryFallback: Boolean,
     accuracy: Int
 ) {
@@ -370,6 +390,58 @@ fun ThermoHygroScreen(
             }
         }
 
+        // Atmospheric Barometer Card
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .background(Color(0xFF111827))
+                .border(1.dp, Color(0xFF1E293B))
+                .padding(20.dp)
+        ) {
+            val barometerSourceLabel = if (hasHardwareBarometer) {
+                "ATMOSPHERIC BAROMETER (SENSOR_TYPE_6)"
+            } else {
+                "BAROMETER SENSOR UNAVAILABLE"
+            }
+            Text(
+                text = barometerSourceLabel,
+                color = Color(0xFF94A3B8),
+                fontSize = 11.sp,
+                fontFamily = FontFamily.Monospace
+            )
+            Spacer(modifier = Modifier.height(6.dp))
+            Text(
+                text = pressureHpa?.let { String.format(Locale.US, "%.1f hPa", it) } ?: "----.- hPa",
+                color = Color(0xFFF43F5E),
+                fontSize = 34.sp,
+                fontWeight = FontWeight.Bold,
+                fontFamily = FontFamily.Monospace
+            )
+
+            if (pressureHpa != null) {
+                Spacer(modifier = Modifier.height(8.dp))
+                val inHg = hpaToInHg(pressureHpa)
+                val altFt = calculateAltitudeFeet(pressureHpa)
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween
+                ) {
+                    Text(
+                        text = String.format(Locale.US, "%.2f inHg", inHg),
+                        color = Color(0xFF94A3B8),
+                        fontSize = 12.sp,
+                        fontFamily = FontFamily.Monospace
+                    )
+                    Text(
+                        text = String.format(Locale.US, "Est. Alt: %,.0f ft", altFt),
+                        color = Color(0xFF94A3B8),
+                        fontSize = 12.sp,
+                        fontFamily = FontFamily.Monospace
+                    )
+                }
+            }
+        }
+
         // 3-Axis Accelerometer Card
         Column(
             modifier = Modifier
@@ -477,3 +549,4 @@ fun GraphicCompassDial(headingDeg: Float) {
         drawCircle(color = Color(0xFF06B6D4), radius = 6f, center = Offset(cx, cy))
     }
 }
+
