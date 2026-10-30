@@ -1,0 +1,27 @@
+# Built application files
+*.apk
+*.aar
+*.bundle
+*.apks
+
+# Generated files
+bin/
+build/
+
+# Local configuration file (sdk.dir, etc.)
+local.properties
+
+# Project files
+*.iml
+.gradle/
+.idea/
+out/
+
+# OS specific files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
