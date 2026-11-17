@@ -36,6 +36,7 @@ import androidx.compose.ui.unit.sp
 import androidx.core.content.ContextCompat
 import java.util.Locale
 import kotlin.math.ln
+import kotlin.math.sqrt
 
 /**
  * Zero-Network Android Thermometer (°F), Relative Humidity (% RH), Barometer (hPa / inHg),
@@ -442,27 +443,27 @@ fun ThermoHygroScreen(
             }
         }
 
-        // 3-Axis Accelerometer Card
+        // 3-Axis Accelerometer Card with 2D Visualizer Panel
         Column(
             modifier = Modifier
                 .fillMaxWidth()
                 .background(Color(0xFF111827))
                 .border(1.dp, Color(0xFF1E293B))
-                .padding(20.dp)
+                .padding(20.dp),
+            horizontalAlignment = Alignment.CenterHorizontally
         ) {
             Text(
-                text = "ACCELEROMETER AXES (X / Y / Z m/s²)",
+                text = "ACCELEROMETER (3-AXIS & G-FORCE)",
                 color = Color(0xFF94A3B8),
                 fontSize = 11.sp,
-                fontFamily = FontFamily.Monospace
+                fontFamily = FontFamily.Monospace,
+                modifier = Modifier.fillMaxWidth()
             )
-            Spacer(modifier = Modifier.height(6.dp))
-            Text(
-                text = String.format(Locale.US, "X: %+.2f   Y: %+.2f   Z: %+.2f m/s²", accelX, accelY, accelZ),
-                color = Color(0xFFA78BFA),
-                fontSize = 19.sp,
-                fontWeight = FontWeight.Bold,
-                fontFamily = FontFamily.Monospace
+            Spacer(modifier = Modifier.height(10.dp))
+            AccelerometerVisualizerPanel(
+                accelX = accelX,
+                accelY = accelY,
+                accelZ = accelZ
             )
         }
 
@@ -549,4 +550,90 @@ fun GraphicCompassDial(headingDeg: Float) {
         drawCircle(color = Color(0xFF06B6D4), radius = 6f, center = Offset(cx, cy))
     }
 }
+
+@Composable
+fun AccelerometerVisualizerPanel(
+    accelX: Float,
+    accelY: Float,
+    accelZ: Float
+) {
+    val totalMagnitude = sqrt(accelX * accelX + accelY * accelY + accelZ * accelZ)
+    val totalG = totalMagnitude / 9.80665f
+
+    Column(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalAlignment = Alignment.CenterHorizontally
+    ) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween
+        ) {
+            Text(
+                text = String.format(Locale.US, "X: %+.2f  Y: %+.2f  Z: %+.2f m/s²", accelX, accelY, accelZ),
+                color = Color(0xFFA78BFA),
+                fontSize = 13.sp,
+                fontWeight = FontWeight.Bold,
+                fontFamily = FontFamily.Monospace
+            )
+            Text(
+                text = String.format(Locale.US, "%.2f G", totalG),
+                color = Color(0xFFC084FC),
+                fontSize = 13.sp,
+                fontWeight = FontWeight.Bold,
+                fontFamily = FontFamily.Monospace
+            )
+        }
+        Spacer(modifier = Modifier.height(12.dp))
+        Text(
+            text = "▼ 2D TILT / BUBBLE LEVEL ▼",
+            color = Color(0xFFA78BFA),
+            fontSize = 12.sp,
+            fontFamily = FontFamily.Monospace
+        )
+        Spacer(modifier = Modifier.height(6.dp))
+
+        Canvas(modifier = Modifier.size(190.dp)) {
+            val cx = size.width / 2f
+            val cy = size.height / 2f
+            val maxRadius = size.minDimension * 0.44f
+
+            // Outer & inner target rings
+            drawCircle(color = Color(0xFF0B0E17), radius = maxRadius, center = Offset(cx, cy))
+            drawCircle(color = Color(0xFF334155), radius = maxRadius, center = Offset(cx, cy), style = Stroke(width = 4f))
+            drawCircle(color = Color(0xFF1E293B), radius = maxRadius * 0.66f, center = Offset(cx, cy), style = Stroke(width = 2f))
+            drawCircle(color = Color(0xFF1E293B), radius = maxRadius * 0.33f, center = Offset(cx, cy), style = Stroke(width = 2f))
+
+            // Crosshair axes
+            drawLine(
+                color = Color(0xFF334155),
+                start = Offset(cx - maxRadius, cy),
+                end = Offset(cx + maxRadius, cy),
+                strokeWidth = 2f
+            )
+            drawLine(
+                color = Color(0xFF334155),
+                start = Offset(cx, cy - maxRadius),
+                end = Offset(cx, cy + maxRadius),
+                strokeWidth = 2f
+            )
+
+            // Clamp tilt offset to target radius
+            val scale = maxRadius / 9.81f
+            val bubbleOffsetX = (-accelX * scale).coerceIn(-maxRadius, maxRadius)
+            val bubbleOffsetY = (accelY * scale).coerceIn(-maxRadius, maxRadius)
+
+            val bubbleCenter = Offset(cx + bubbleOffsetX, cy + bubbleOffsetY)
+            val distFromCenter = sqrt(bubbleOffsetX * bubbleOffsetX + bubbleOffsetY * bubbleOffsetY)
+            val isCentered = distFromCenter < maxRadius * 0.15f
+
+            val bubbleColor = if (isCentered) Color(0xFF34D399) else Color(0xFFA78BFA)
+
+            // Dynamic bubble target indicator
+            drawCircle(color = bubbleColor.copy(alpha = 0.30f), radius = 20f, center = bubbleCenter)
+            drawCircle(color = bubbleColor, radius = 12f, center = bubbleCenter)
+            drawCircle(color = Color.White, radius = 4f, center = bubbleCenter)
+        }
+    }
+}
+
 
