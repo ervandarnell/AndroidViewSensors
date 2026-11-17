@@ -413,7 +413,7 @@ fun ThermoHygroScreen(
             Text(
                 text = pressureHpa?.let { String.format(Locale.US, "%.1f hPa", it) } ?: "----.- hPa",
                 color = Color(0xFFF43F5E),
-                fontSize = 34.sp,
+                fontSize = 35.sp,
                 fontWeight = FontWeight.Bold,
                 fontFamily = FontFamily.Monospace
             )
