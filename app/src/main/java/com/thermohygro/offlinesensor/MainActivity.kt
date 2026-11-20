@@ -61,14 +61,14 @@ class MainActivity : ComponentActivity(), SensorEventListener {
     private var relativeHumidity by mutableStateOf<Float?>(null)
     private var rawPressureHpa by mutableStateOf<Float?>(null)
     private var usingBatteryFallback by mutableStateOf(false)
-    private var accelX by mutableStateOf(0.0f)
-    private var accelY by mutableStateOf(0.0f)
-    private var accelZ by mutableStateOf(9.81f)
-    private var magX by mutableStateOf(0.0f)
-    private var magY by mutableStateOf(25.0f)
-    private var magZ by mutableStateOf(-40.0f)
-    private var compassHeadingDeg by mutableStateOf(0.0f)
-    private var sensorAccuracy by mutableStateOf(SensorManager.SENSOR_STATUS_ACCURACY_HIGH)
+    private var accelX by mutableFloatStateOf(0.0f)
+    private var accelY by mutableFloatStateOf(0.0f)
+    private var accelZ by mutableFloatStateOf(9.81f)
+    private var magX by mutableFloatStateOf(0.0f)
+    private var magY by mutableFloatStateOf(25.0f)
+    private var magZ by mutableFloatStateOf(-40.0f)
+    private var compassHeadingDeg by mutableFloatStateOf(0.0f)
+    private var sensorAccuracy by mutableIntStateOf(SensorManager.SENSOR_STATUS_ACCURACY_HIGH)
 
     private val gravityReading = FloatArray(3)
     private val geomagneticReading = FloatArray(3)
@@ -92,7 +92,7 @@ class MainActivity : ComponentActivity(), SensorEventListener {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
-        sensorManager = getSystemService(Context.SENSOR_SERVICE) as SensorManager
+        sensorManager = getSystemService(SENSOR_SERVICE) as SensorManager
         ambientTempSensor = sensorManager.getDefaultSensor(Sensor.TYPE_AMBIENT_TEMPERATURE)
         relativeHumiditySensor = sensorManager.getDefaultSensor(Sensor.TYPE_RELATIVE_HUMIDITY)
         pressureSensor = sensorManager.getDefaultSensor(Sensor.TYPE_PRESSURE)
